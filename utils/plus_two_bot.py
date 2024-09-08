@@ -5,8 +5,8 @@ import logging
 from twitchio.ext import commands
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from database_manager import DatabaseManager
-from utils import check_stream_status, is_valid_username
+from .db_manager import DatabaseManager
+from .utils import check_stream_status, is_valid_username
 
 # Load environment variables
 load_dotenv()
