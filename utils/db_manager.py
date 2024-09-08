@@ -14,7 +14,8 @@ class DatabaseManager:
             self.conn.execute('''
                 CREATE TABLE IF NOT EXISTS plus_two_counts (
                     username TEXT PRIMARY KEY,
-                    count INTEGER NOT NULL DEFAULT 0
+                    count INTEGER NOT NULL DEFAULT 0,
+                    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             # Table for tracking cooldowns between users
@@ -65,9 +66,11 @@ class DatabaseManager:
         # Update +2 count for a user
         with self.conn:
             self.conn.execute('''
-                INSERT INTO plus_two_counts (username, count) 
-                VALUES (?, ?) 
-                ON CONFLICT(username) DO UPDATE SET count = count + ?
+                INSERT INTO plus_two_counts (username, count, last_updated) 
+                VALUES (?, ?, CURRENT_TIMESTAMP) 
+                ON CONFLICT(username) DO UPDATE SET 
+                count = count + ?,
+                last_updated = CURRENT_TIMESTAMP
             ''', (username, change, change))
 
     def get_top_recipients(self, limit):
