@@ -1,5 +1,5 @@
 import time
-from plus_two_bot import PlusTwoBot
+from utils.plus_two_bot import PlusTwoBot
 
 if __name__ == "__main__":
     while True:
