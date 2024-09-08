@@ -23,7 +23,7 @@ def get_leaderboard(db_path, period='all_time'):
         query = "SELECT username, count FROM plus_two_counts ORDER BY count DESC LIMIT 100"
 
     cursor.execute(query)
-    leaderboard = cursor.fetchall()
+    leaderboard = [{"username": username, "count": count} for username, count in cursor.fetchall()]
     conn.close()
     return leaderboard
 
@@ -93,10 +93,9 @@ def main():
 
     for period in periods:
         leaderboard = get_leaderboard(db_path, period)
-        html = generate_html(leaderboard, period)
-        filename = 'index.html' if period == 'all_time' else f'{period}.html'
-        with open(os.path.join('..', filename), 'w') as f:
-            f.write(html)
+        filename = 'leaderboard.json' if period == 'all_time' else f'{period}_leaderboard.json'
+        with open(filename, 'w') as f:
+            json.dump(leaderboard, f)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -106,7 +105,7 @@ def main():
 
     for username, count in all_users:
         user_data = {'username': username, 'count': count}
-        with open(os.path.join('..', 'user_stats', f'{username.lower()}.json'), 'w') as f:
+        with open(f'user_stats/{username.lower()}.json', 'w') as f:
             json.dump(user_data, f)
 
 if __name__ == "__main__":

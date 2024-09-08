@@ -60,6 +60,13 @@ To extend the bot's functionality:
 2. Implement new database operations in `db_manager.py` if needed
 3. Add utility functions in `utils.py`
 
+## Leaderboard
+
+You can view the PlusTwo leaderboard and search for user stats at:
+https://rasingh02.github.io/Plus2Bot/
+
+The leaderboard is updated daily and provides all-time, monthly, and yearly rankings.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
