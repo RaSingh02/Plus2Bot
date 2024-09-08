@@ -1,5 +1,7 @@
 import sqlite3
 from datetime import datetime
+import os
+from github import Github
 
 class DatabaseManager:
     def __init__(self, db_file):
@@ -83,3 +85,11 @@ class DatabaseManager:
         cursor = self.conn.execute('SELECT count FROM plus_two_counts WHERE username = ?', (username,))
         result = cursor.fetchone()
         return result[0] if result else 0
+
+    def upload_db_artifact(self):
+        if 'GITHUB_TOKEN' in os.environ:
+            g = Github(os.environ['GITHUB_TOKEN'])
+            repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
+            with open(self.db_file, 'rb') as f:
+                content = f.read()
+            repo.create_git_blob(content.decode('latin1'), 'base64')
