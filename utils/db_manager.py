@@ -91,5 +91,4 @@ class DatabaseManager:
             g = Github(os.environ['GITHUB_TOKEN'])
             repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
             with open(self.db_file, 'rb') as f:
-                content = f.read()
-            repo.create_git_blob(content.decode('latin1'), 'base64')
+                repo.create_git_blob(f.read(), "base64")

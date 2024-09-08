@@ -45,6 +45,7 @@ class PlusTwoBot(commands.Bot):
         # Called when the bot is ready
         logging.info(f'Logged in as | {self.nick}')
         self.loop.create_task(self.stream_check_loop())
+        self.loop.create_task(self.periodic_db_upload())
 
     async def event_user_join(self, user, channel):
         # Called when a user joins the chat
@@ -153,3 +154,8 @@ class PlusTwoBot(commands.Bot):
     async def total_plus_two(self, ctx):
         # Command to show total +2 count for the current stream
         await ctx.send(f"Total +2's given in this stream: {self.total_plus_twos}")
+
+    async def periodic_db_upload(self):
+        while True:
+            await asyncio.sleep(3600)  # Wait for 1 hour
+            self.db_manager.upload_db_artifact()
