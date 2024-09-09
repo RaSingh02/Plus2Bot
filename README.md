@@ -9,6 +9,7 @@ PlusTwo is a Twitch chat bot that allows viewers to give "+2" or "-2" points to 
 - Tracks total +2 count for each stream session
 - Provides commands for viewing personal and overall statistics
 - Automatically resets counts when a stream ends
+- Automatically cleans inactive chatters every 5 minutes
 
 ## Commands
 
@@ -17,6 +18,7 @@ PlusTwo is a Twitch chat bot that allows viewers to give "+2" or "-2" points to 
 - `!plus2stats`: Show top 5 +2 recipients
 - `!myplus2`: Show your personal +2 count
 - `!totalplus2`: Show total +2 count for the current stream
+- `!commands`: List all available commands
 
 ## Setup
 
