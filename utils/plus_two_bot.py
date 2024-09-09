@@ -69,6 +69,7 @@ class PlusTwoBot(commands.Bot):
     async def stream_check_loop(self):
         # Periodically check if the stream is live
         was_live = False
+        check_interval = 300  # Start with 5 minutes
         while True:
             is_live = await check_stream_status(self.client_id, os.getenv("ACCESS_TOKEN"), os.getenv("BROADCASTER"))
             if not was_live and is_live:
@@ -83,7 +84,13 @@ class PlusTwoBot(commands.Bot):
                 # Optionally, you can reset counts or stop processing commands here
 
             was_live = is_live
-            await asyncio.sleep(300)  # Check every 5 minutes
+            await asyncio.sleep(check_interval)  # Check every 5 minutes
+
+            # Adjust check interval based on activity (example logic)
+            if self.is_operating:
+                check_interval = 300  # Keep checking every 5 minutes
+            else:
+                check_interval = 600  # Increase to 10 minutes when not operating
 
     async def event_message(self, message):
         # Called when a message is sent in the chat
@@ -103,52 +110,40 @@ class PlusTwoBot(commands.Bot):
         self.current_chatters[message.channel.name].add(message.author.name.lower())
         self.chatter_last_seen[message.channel.name][message.author.name.lower()] = datetime.now()
 
-        # Check if the message is a single command
-        command_list = ['!plus2stats', '!myplus2', '!totalplus2', '!commands']
-        if message.content in command_list:
-            await self.handle_commands(message)
-        else:
-            # Check for +2 and -2 mentions
-            plus_mentions = re.findall(r'\+2\s+@(\w+)', message.content, re.IGNORECASE)
-            minus_mentions = re.findall(r'-2\s+@(\w+)', message.content, re.IGNORECASE)
+        # Check for +2 and -2 mentions
+        plus_mentions = re.findall(r'\+2\s+@(\w+)', message.content, re.IGNORECASE)
+        minus_mentions = re.findall(r'-2\s+@(\w+)', message.content, re.IGNORECASE)
 
-            if len(plus_mentions) + len(minus_mentions) > 1:
-                await message.channel.send("Please use only one +2 or -2 command at a time.")
-                return
+        # Combine mentions into a single dictionary for batch processing
+        mentions = {}
+        for user in plus_mentions:
+            mentions[user.lower()] = True  # Mark as +2
+        for user in minus_mentions:
+            mentions[user.lower()] = False  # Mark as -2
 
-            for mentioned_user in plus_mentions:
-                if mentioned_user.lower() not in self.current_chatters[message.channel.name]:
-                    await message.channel.send(f"@{mentioned_user} is not in the chat.")
-                    return
-                await self.handle_plus_two(message.channel, message.author, mentioned_user.lower(), is_plus=True)
+        # Process all mentions in batch
+        await self.handle_batch_plus_two(message.channel, message.author, mentions)
 
-            for mentioned_user in minus_mentions:
-                if mentioned_user.lower() not in self.current_chatters[message.channel.name]:
-                    await message.channel.send(f"@{mentioned_user} is not in the chat.")
-                    return
-                await self.handle_plus_two(message.channel, message.author, mentioned_user.lower(), is_plus=False)
+    async def handle_batch_plus_two(self, channel, author, mentions):
+        # Handle batch +2 or -2 commands
+        for recipient, is_plus in mentions.items():
+            if not is_valid_username(recipient):
+                await channel.send(f"@{author.name}, '{recipient}' is not a valid username.")
+                continue
 
-            # Handle unrecognized commands
-            if not plus_mentions and not minus_mentions:
-                await message.channel.send("Unrecognized command or format. Please try again.")
-
-    async def handle_plus_two(self, channel, author, recipient, is_plus):
-        # Handle the +2 or -2 command
-        if not recipient or not is_valid_username(recipient):
-            await channel.send(f"@{author.name}, that doesn't seem to be a valid username.")
-            return
-
-        action = "+2" if is_plus else "-2"
-        # Check if the author can give a +2
-        if self.cooldown_manager.can_give_plus_two(author.name.lower(), COOLDOWN_PERIOD):
-            if recipient.lower() in self.current_chatters.get(channel.name, set()):
-                self.update_count(recipient, is_plus)
-                self.save_data()
+            action = "+2" if is_plus else "-2"
+            # Check if the author can give a +2
+            if self.cooldown_manager.can_give_plus_two(author.name.lower(), COOLDOWN_PERIOD):
+                if recipient in self.current_chatters.get(channel.name, set()):
+                    self.update_count(recipient, is_plus)
+                else:
+                    await channel.send(f"@{recipient} is not in the chat.")
             else:
-                await channel.send(f"@{recipient} is not in the chat.")
-        else:
-            time_left = self.cooldown_manager.get_cooldown_time(author.name.lower())
-            await channel.send(f"@{author.name}, you must wait {time_left.seconds // 60} minutes and {time_left.seconds % 60} seconds before giving another {action} to anyone.")
+                time_left = self.cooldown_manager.get_cooldown_time(author.name.lower())
+                await channel.send(f"@{author.name}, you must wait {time_left.seconds // 60} minutes and {time_left.seconds % 60} seconds before giving another {action} to anyone.")
+
+        # Save data after processing all mentions
+        self.save_data()
 
     def update_count(self, username, is_plus):
         # Update +2 count for a user

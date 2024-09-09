@@ -54,7 +54,7 @@ class DatabaseManager:
         return cooldown_tracker, total_plus_twos
 
     def save_data(self, cooldown_tracker, total_plus_twos):
-        # Save cooldown tracker and total +2 count to database
+        # Save cooldown tracker and total +2 count to database in a single transaction
         with self.conn:
             self.conn.execute('DELETE FROM cooldown_tracker')
             for sender, recipients in cooldown_tracker.items():
@@ -64,8 +64,9 @@ class DatabaseManager:
             
             self.conn.execute('UPDATE total_counts SET count = ? WHERE id = 1', (total_plus_twos,))
 
-    def update_count(self, username, change):
-        # Update +2 count for a user
+    def update_count(self, username, is_plus):
+        # Update +2 count for a user in a single transaction
+        change = 1 if is_plus else -1
         with self.conn:
             self.conn.execute('''
                 INSERT INTO plus_two_counts (username, count, last_updated) 
@@ -73,7 +74,7 @@ class DatabaseManager:
                 ON CONFLICT(username) DO UPDATE SET 
                 count = count + ?,
                 last_updated = CURRENT_TIMESTAMP
-            ''', (username, change, change))
+            ''', (username.lower(), change, change))
 
     def get_top_recipients(self, limit):
         # Get top recipients of +2s
