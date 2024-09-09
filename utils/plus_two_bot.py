@@ -5,6 +5,7 @@ import logging
 from twitchio.ext import commands
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+
 from .db_manager import DatabaseManager
 from .utils import check_stream_status, is_valid_username
 
@@ -15,7 +16,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Define cooldown period
-COOLDOWN_PERIOD = os.getenv('COOLDOWN_MINUTES', 2)
+COOLDOWN_PERIOD = timedelta(minutes=int(os.getenv('COOLDOWN_MINUTES', 2)))
 
 class PlusTwoBot(commands.Bot):
     def __init__(self):
@@ -27,10 +28,11 @@ class PlusTwoBot(commands.Bot):
         )
         self.client_id = os.getenv("CLIENT_ID")
         self.db_manager = DatabaseManager('plus_two_data.db')
-        self.active_users = set()
         self.cooldown_tracker = {}
         self.total_plus_twos = 0
         self.load_data()
+        self.current_chatters = {channel: set() for channel in self.initial_channels}
+        self.chatter_last_seen = {channel: {} for channel in self.initial_channels}
 
     def load_data(self):
         # Load data from database
@@ -46,16 +48,7 @@ class PlusTwoBot(commands.Bot):
         logging.info(f'Logged in as | {self.nick}')
         self.loop.create_task(self.stream_check_loop())
         self.loop.create_task(self.periodic_db_upload())
-
-    async def event_user_join(self, user, channel):
-        # Called when a user joins the chat
-        self.active_users.add(user.name.lower())
-        logging.info(f"{user.name} has joined the chat.")
-
-    async def event_user_part(self, user, channel):
-        # Called when a user leaves the chat
-        self.active_users.discard(user.name.lower())
-        logging.info(f"{user.name} has left the chat.")
+        self.loop.create_task(self.clean_inactive_chatters())
 
     def reset_total_count(self):
         # Reset the total +2 count
@@ -78,6 +71,10 @@ class PlusTwoBot(commands.Bot):
         if message.echo:
             return
 
+        # Update chatter list
+        self.current_chatters[message.channel.name].add(message.author.name.lower())
+        self.chatter_last_seen[message.channel.name][message.author.name.lower()] = datetime.now()
+
         await self.handle_commands(message)
 
         # Check for +2 and -2 mentions
@@ -98,10 +95,9 @@ class PlusTwoBot(commands.Bot):
 
         action = "+2" if is_plus else "-2"
         if self.can_give_plus_two(author.name.lower(), recipient):
-            if recipient.lower() in self.active_users:
+            if recipient.lower() in self.current_chatters.get(channel.name, set()):
                 self.update_count(recipient, is_plus)
                 self.save_data()
-                await channel.send(f"@{author.name} gave a {action} to @{recipient}!")
             else:
                 await channel.send(f"@{recipient} is not in the chat.")
         else:
@@ -155,7 +151,26 @@ class PlusTwoBot(commands.Bot):
         # Command to show total +2 count for the current stream
         await ctx.send(f"Total +2's given in this stream: {self.total_plus_twos}")
 
+    @commands.command(name='commands')
+    async def command_list(self, ctx):
+        # Command to showcase list of available commands
+        await ctx.send(f"Available commands: !plus2stats | !myplus2 | !totalplus2")
+
     async def periodic_db_upload(self):
         while True:
             await asyncio.sleep(3600)  # Wait for 1 hour
             self.db_manager.upload_db_artifact()
+
+    async def clean_inactive_chatters(self):
+        while True:
+            await asyncio.sleep(300)  # Run every 5 minutes
+            current_time = datetime.now()
+            for channel in self.initial_channels:
+                inactive_chatters = [
+                    chatter for chatter, last_seen in self.chatter_last_seen[channel].items()
+                    if (current_time - last_seen) > timedelta(minutes=30)
+                ]
+                for chatter in inactive_chatters:
+                    self.current_chatters[channel].remove(chatter)
+                    del self.chatter_last_seen[channel][chatter]
+            logging.info(f"Cleaned inactive chatters. Current chatters: {sum(len(chatters) for chatters in self.current_chatters.values())}")
