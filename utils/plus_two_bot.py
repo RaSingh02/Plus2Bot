@@ -26,6 +26,7 @@ class PlusTwoBot(commands.Bot):
             prefix='!',
             initial_channels=[os.getenv("BROADCASTER")]
         )
+        self.initial_channels = [os.getenv("BROADCASTER")]  # Explicitly set the attribute
         self.client_id = os.getenv("CLIENT_ID")
         self.db_manager = DatabaseManager('plus_two_data.db')
         self.cooldown_tracker = {}
@@ -68,24 +69,46 @@ class PlusTwoBot(commands.Bot):
 
     async def event_message(self, message):
         # Called when a message is sent in the chat
-        if message.echo:
+        if message.echo or not message.content.strip():
             return
+
+        # Ensure the channel is initialized in current_chatters
+        if message.channel.name not in self.current_chatters:
+            self.current_chatters[message.channel.name] = set()
+            self.chatter_last_seen[message.channel.name] = {}
 
         # Update chatter list
         self.current_chatters[message.channel.name].add(message.author.name.lower())
         self.chatter_last_seen[message.channel.name][message.author.name.lower()] = datetime.now()
 
-        await self.handle_commands(message)
+        # Check if the message is a single command
+        command_list = ['!plus2stats', '!myplus2', '!totalplus2', '!commands']
+        if message.content in command_list:
+            await self.handle_commands(message)
+        else:
+            # Check for +2 and -2 mentions
+            plus_mentions = re.findall(r'\+2\s+@(\w+)', message.content, re.IGNORECASE)
+            minus_mentions = re.findall(r'-2\s+@(\w+)', message.content, re.IGNORECASE)
 
-        # Check for +2 and -2 mentions
-        plus_mentions = re.findall(r'\+2\s+@(\w+)', message.content, re.IGNORECASE)
-        minus_mentions = re.findall(r'-2\s+@(\w+)', message.content, re.IGNORECASE)
-        
-        for mentioned_user in plus_mentions:
-            await self.handle_plus_two(message.channel, message.author, mentioned_user.lower(), is_plus=True)
-        
-        for mentioned_user in minus_mentions:
-            await self.handle_plus_two(message.channel, message.author, mentioned_user.lower(), is_plus=False)
+            if len(plus_mentions) + len(minus_mentions) > 1:
+                await message.channel.send("Please use only one +2 or -2 command at a time.")
+                return
+
+            for mentioned_user in plus_mentions:
+                if mentioned_user.lower() not in self.current_chatters[message.channel.name]:
+                    await message.channel.send(f"@{mentioned_user} is not in the chat.")
+                    return
+                await self.handle_plus_two(message.channel, message.author, mentioned_user.lower(), is_plus=True)
+
+            for mentioned_user in minus_mentions:
+                if mentioned_user.lower() not in self.current_chatters[message.channel.name]:
+                    await message.channel.send(f"@{mentioned_user} is not in the chat.")
+                    return
+                await self.handle_plus_two(message.channel, message.author, mentioned_user.lower(), is_plus=False)
+
+            # Handle unrecognized commands
+            if not plus_mentions and not minus_mentions:
+                await message.channel.send("Unrecognized command or format. Please try again.")
 
     async def handle_plus_two(self, channel, author, recipient, is_plus):
         # Handle +2 or -2 command
@@ -154,7 +177,7 @@ class PlusTwoBot(commands.Bot):
     @commands.command(name='commands')
     async def command_list(self, ctx):
         # Command to showcase list of available commands
-        await ctx.send(f"Available commands: !plus2stats | !myplus2 | !totalplus2")
+        await ctx.send(f"!plus2stats !myplus2 !totalplus2")
 
     async def periodic_db_upload(self):
         while True:
