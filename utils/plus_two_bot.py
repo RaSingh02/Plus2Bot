@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 from .db_manager import DatabaseManager
 from .utils import check_stream_status, is_valid_username
+from .cooldown_manager import CooldownManager
 
 # Load environment variables
 load_dotenv()
@@ -26,27 +27,36 @@ class PlusTwoBot(commands.Bot):
             prefix='!',
             initial_channels=[os.getenv("BROADCASTER")]
         )
-        self.initial_channels = [os.getenv("BROADCASTER")]  # Explicitly set the attribute
+        self.initial_channels = [os.getenv("BROADCASTER")]
         self.client_id = os.getenv("CLIENT_ID")
         self.db_manager = DatabaseManager('plus_two_data.db')
-        self.cooldown_tracker = {}
+        self.cooldown_manager = CooldownManager()  # Use the new CooldownManager
         self.total_plus_twos = 0
         self.load_data()
         self.current_chatters = {channel: set() for channel in self.initial_channels}
         self.chatter_last_seen = {channel: {} for channel in self.initial_channels}
+        self.is_operating = False  # Track if the bot is currently operating
 
     def load_data(self):
         # Load data from database
-        self.cooldown_tracker, self.total_plus_twos = self.db_manager.load_data()
+        self.cooldown_manager.cooldown_tracker, self.total_plus_twos = self.db_manager.load_data()
         logging.info("Data loaded successfully.")
 
     def save_data(self):
         # Save data to database
-        self.db_manager.save_data(self.cooldown_tracker, self.total_plus_twos)
+        self.db_manager.save_data(self.cooldown_manager.cooldown_tracker, self.total_plus_twos)
 
     async def event_ready(self):
         # Called when the bot is ready
         logging.info(f'Logged in as | {self.nick}')
+        
+        # Check if the broadcaster is live
+        is_live = await check_stream_status(self.client_id, os.getenv("ACCESS_TOKEN"), os.getenv("BROADCASTER"))
+        if not is_live:
+            logging.warning("The broadcaster is not live. The bot will not operate.")
+            return  # Exit the method to prevent further actions
+
+        # Start the bot's tasks if the broadcaster is live
         self.loop.create_task(self.stream_check_loop())
         self.loop.create_task(self.periodic_db_upload())
         self.loop.create_task(self.clean_inactive_chatters())
@@ -58,18 +68,30 @@ class PlusTwoBot(commands.Bot):
 
     async def stream_check_loop(self):
         # Periodically check if the stream is live
-        was_live = True
+        was_live = False
         while True:
             is_live = await check_stream_status(self.client_id, os.getenv("ACCESS_TOKEN"), os.getenv("BROADCASTER"))
-            if was_live and not is_live:
-                self.reset_total_count()
-                self.save_data()
+            if not was_live and is_live:
+                # The broadcaster just went live
+                self.is_operating = True
+                logging.info("The broadcaster is now live. The bot is now operating.")
+                # You can start any additional tasks here if needed
+            elif was_live and not is_live:
+                # The broadcaster just went offline
+                self.is_operating = False
+                logging.warning("The broadcaster is no longer live. The bot will not operate.")
+                # Optionally, you can reset counts or stop processing commands here
+
             was_live = is_live
-            await asyncio.sleep(300)
+            await asyncio.sleep(300)  # Check every 5 minutes
 
     async def event_message(self, message):
         # Called when a message is sent in the chat
         if message.echo or not message.content.strip():
+            return
+
+        # Ensure the bot is operating before processing messages
+        if not self.is_operating:
             return
 
         # Ensure the channel is initialized in current_chatters
@@ -111,40 +133,22 @@ class PlusTwoBot(commands.Bot):
                 await message.channel.send("Unrecognized command or format. Please try again.")
 
     async def handle_plus_two(self, channel, author, recipient, is_plus):
-        # Handle +2 or -2 command
+        # Handle the +2 or -2 command
         if not recipient or not is_valid_username(recipient):
             await channel.send(f"@{author.name}, that doesn't seem to be a valid username.")
             return
 
         action = "+2" if is_plus else "-2"
-        if self.can_give_plus_two(author.name.lower(), recipient):
+        # Check if the author can give a +2
+        if self.cooldown_manager.can_give_plus_two(author.name.lower(), COOLDOWN_PERIOD):
             if recipient.lower() in self.current_chatters.get(channel.name, set()):
                 self.update_count(recipient, is_plus)
                 self.save_data()
             else:
                 await channel.send(f"@{recipient} is not in the chat.")
         else:
-            time_left = self.get_cooldown_time(author.name.lower(), recipient)
-            await channel.send(f"@{author.name}, you must wait {time_left.seconds // 60} minutes and {time_left.seconds % 60} seconds before giving another {action} to @{recipient}")
-
-    def can_give_plus_two(self, sender, recipient):
-        # Check if a user can give +2 to another user
-        current_time = datetime.now()
-        sender, recipient = sender.lower(), recipient.lower()
-        
-        if sender not in self.cooldown_tracker:
-            self.cooldown_tracker[sender] = {}
-        
-        if recipient in self.cooldown_tracker[sender]:
-            if current_time - self.cooldown_tracker[sender][recipient] < COOLDOWN_PERIOD:
-                return False
-        
-        self.cooldown_tracker[sender][recipient] = current_time
-        return True
-
-    def get_cooldown_time(self, sender, recipient):
-        # Get remaining cooldown time
-        return COOLDOWN_PERIOD - (datetime.now() - self.cooldown_tracker[sender.lower()][recipient.lower()])
+            time_left = self.cooldown_manager.get_cooldown_time(author.name.lower())
+            await channel.send(f"@{author.name}, you must wait {time_left.seconds // 60} minutes and {time_left.seconds % 60} seconds before giving another {action} to anyone.")
 
     def update_count(self, username, is_plus):
         # Update +2 count for a user

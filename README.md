@@ -53,6 +53,7 @@ PlusTwo is a Twitch chat bot that allows viewers to give "+2" or "-2" points to 
 - `utils/plus_two_bot.py`: Main bot logic
 - `utils/db_manager.py`: Database operations
 - `utils/utils.py`: Utility functions
+- `utils/cooldown_manager.py`: Cooldown management logic
 
 ## Development
 
@@ -61,6 +62,7 @@ To extend the bot's functionality:
 1. Add new commands in the `PlusTwoBot` class in `plus_two_bot.py`
 2. Implement new database operations in `db_manager.py` if needed
 3. Add utility functions in `utils.py`
+4. Manage cooldowns using the `CooldownManager` class in `cooldown_manager.py`
 
 ## Leaderboard
 
