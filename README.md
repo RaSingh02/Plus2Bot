@@ -24,19 +24,25 @@ PlusTwo is a Twitch chat bot that allows viewers to give "+2" or "-2" points to 
 
 1. Clone this repository
 2. Install required packages:
-   ```
+   ```bash
    pip install -r requirements.txt
    ```
 3. Create a `.env` file in the root directory with the following content:
-   ```
+   ```env
    ACCESS_TOKEN=your_twitch_access_token
    CLIENT_ID=your_twitch_client_id
    BROADCASTER=channel_name_to_join
-   COOLDOWN_MINUTES=2
+   COOLDOWN_MINUTES=2  # Optional, defaults to 2 if not specified
    ```
-   Note: `COOLDOWN_MINUTES` is optional and defaults to 2 if not specified.
-4. Run the bot:
-   ```
+4. **GitHub Secrets**: If you are using GitHub Actions, set the following secrets in your repository:
+   - `ACCESS_TOKEN`: Your Twitch access token.
+   - `CLIENT_ID`: Your Twitch client ID.
+   - `BROADCASTER`: The Twitch username of the broadcaster.
+   - `COOLDOWN_MINUTES`: The cooldown period in minutes (optional).
+   - `REPOSITORY_NAME`: Your repository name in the format `username/repository-name`.
+
+5. Run the bot:
+   ```bash
    python main.py
    ```
 

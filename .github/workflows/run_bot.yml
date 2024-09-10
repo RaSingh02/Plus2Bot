@@ -24,5 +24,5 @@ jobs:
         CLIENT_ID: ${{ secrets.CLIENT_ID }}    
         BROADCASTER: ${{ secrets.BROADCASTER }}
         COOLDOWN_MINUTES: ${{ secrets.COOLDOWN_MINUTES || 2 }}
-        GITHUB_REPOSITORY: ${{ secrets.GITHUB_REPOSITORY }}
+        REPOSITORY_NAME: ${{ secrets.REPOSITORY_NAME }}
       run: python main.py

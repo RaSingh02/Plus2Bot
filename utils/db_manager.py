@@ -96,6 +96,6 @@ class DatabaseManager:
     def upload_db_artifact(self):
         if 'GITHUB_TOKEN' in os.environ:
             g = Github(os.environ['GITHUB_TOKEN'])
-            repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
+            repo = g.get_repo(os.environ['REPOSITORY_NAME'])
             with open(self.db_file, 'rb') as f:
                 repo.create_git_blob(f.read(), "base64")
