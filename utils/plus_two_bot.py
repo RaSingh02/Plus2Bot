@@ -98,8 +98,11 @@ class PlusTwoBot(commands.Bot):
         if message.echo or not message.content.strip():
             return
 
+        logging.info(f"Received message: {message.content} from {message.author.name}")  # Log the received message
+
         # Ensure the bot is operating before processing messages
         if not self.is_operating:
+            logging.warning("Bot is not operating. Ignoring message.")
             return
 
         # Ensure the channel is initialized in current_chatters
@@ -114,6 +117,8 @@ class PlusTwoBot(commands.Bot):
         # Check for +2 and -2 mentions
         plus_mentions = re.findall(r'\+2\s+@(\w+)', message.content, re.IGNORECASE)
         minus_mentions = re.findall(r'-2\s+@(\w+)', message.content, re.IGNORECASE)
+
+        logging.info(f"Plus mentions: {plus_mentions}, Minus mentions: {minus_mentions}")  # Log mentions found
 
         # Combine mentions into a single dictionary for batch processing
         mentions = {}
