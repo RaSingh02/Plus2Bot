@@ -136,7 +136,7 @@ class PlusTwoBot(commands.Bot):
             # Check if the author can give a +2
             if self.cooldown_manager.can_give_plus_two(author.name.lower(), COOLDOWN_PERIOD):
                 if recipient in self.current_chatters.get(channel.name, set()):
-                    self.update_count(recipient, is_plus)
+                    self.update_count(recipient, is_plus, author.name.lower())  # Pass the giver's name
                     self.data_changed = True  # Mark data as changed
                 else:
                     await channel.send(f"@{recipient} is not in the chat.")
@@ -144,12 +144,18 @@ class PlusTwoBot(commands.Bot):
                 time_left = self.cooldown_manager.get_cooldown_time(author.name.lower())
                 await channel.send(f"@{author.name}, you must wait {time_left.seconds // 60} minutes and {time_left.seconds % 60} seconds before giving another {action} to anyone.")
 
-    def update_count(self, username, is_plus):
+    def update_count(self, username, is_plus, giver):
         # Update +2 count for a user
         change = 1 if is_plus else -1
         self.db_manager.update_count(username.lower(), change)
         self.total_plus_twos += change
         self.total_plus_twos = max(0, self.total_plus_twos)
+        
+        # Log the +2 action with the giver's name
+        if is_plus:
+            logging.info(f"{username} received a +2 from {giver}.")
+        else:
+            logging.info(f"{username} received a -2 from {giver}.")
 
     @commands.command(name='plus2stats')
     async def plus_two_stats(self, ctx):
