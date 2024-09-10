@@ -60,6 +60,7 @@ class PlusTwoBot(commands.Bot):
         self.loop.create_task(self.stream_check_loop())
         self.loop.create_task(self.periodic_db_upload())
         self.loop.create_task(self.clean_inactive_chatters())
+        self.loop.create_task(self.periodic_data_save())  # Start periodic saving
 
     def reset_total_count(self):
         # Reset the total +2 count
@@ -136,6 +137,7 @@ class PlusTwoBot(commands.Bot):
             if self.cooldown_manager.can_give_plus_two(author.name.lower(), COOLDOWN_PERIOD):
                 if recipient in self.current_chatters.get(channel.name, set()):
                     self.update_count(recipient, is_plus)
+                    self.data_changed = True  # Mark data as changed
                 else:
                     await channel.send(f"@{recipient} is not in the chat.")
             else:
@@ -196,3 +198,8 @@ class PlusTwoBot(commands.Bot):
                     self.current_chatters[channel].remove(chatter)
                     del self.chatter_last_seen[channel][chatter]
             logging.info(f"Cleaned inactive chatters. Current chatters: {sum(len(chatters) for chatters in self.current_chatters.values())}")
+
+    async def periodic_data_save(self):
+        while True:
+            await asyncio.sleep(300)  # Save every 5 minutes
+            self.save_data()  # Save data periodically
