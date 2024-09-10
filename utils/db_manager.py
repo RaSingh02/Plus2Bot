@@ -1,7 +1,11 @@
-import sqlite3
-from datetime import datetime
 import os
+import sqlite3
+import logging
+
+from datetime import datetime
 from github import Github
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class DatabaseManager:
     def __init__(self, db_file):
@@ -54,15 +58,17 @@ class DatabaseManager:
         return cooldown_tracker, total_plus_twos
 
     def save_data(self, cooldown_tracker, total_plus_twos):
-        # Save cooldown tracker and total +2 count to database in a single transaction
-        with self.conn:
-            self.conn.execute('DELETE FROM cooldown_tracker')
-            for sender, recipients in cooldown_tracker.items():
-                for recipient, timestamp in recipients.items():
-                    self.conn.execute('INSERT INTO cooldown_tracker (sender, recipient, timestamp) VALUES (?, ?, ?)', 
-                                      (sender, recipient, timestamp.isoformat()))
-            
-            self.conn.execute('UPDATE total_counts SET count = ? WHERE id = 1', (total_plus_twos,))
+        try:
+            with self.conn:
+                self.conn.execute('DELETE FROM cooldown_tracker')
+                for sender, recipients in cooldown_tracker.items():
+                    for recipient, timestamp in recipients.items():
+                        self.conn.execute('INSERT INTO cooldown_tracker (sender, recipient, timestamp) VALUES (?, ?, ?)', 
+                                        (sender, recipient, timestamp.isoformat()))
+                self.conn.execute('UPDATE total_counts SET count = ? WHERE id = 1', (total_plus_twos,))
+            logging.info("Data saved successfully.")
+        except Exception as e:
+            logging.error(f"Error saving data: {e}")
 
     def update_count(self, username, is_plus):
         # Update +2 count for a user in a single transaction

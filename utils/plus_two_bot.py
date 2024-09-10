@@ -180,12 +180,12 @@ class PlusTwoBot(commands.Bot):
 
     async def periodic_db_upload(self):
         while True:
-            await asyncio.sleep(3600)  # Wait for 1 hour
+            await asyncio.sleep(1800)  # Wait for 30 minutes
             self.db_manager.upload_db_artifact()
 
     async def clean_inactive_chatters(self):
         while True:
-            await asyncio.sleep(300)  # Run every 5 minutes
+            await asyncio.sleep(900)  # Run every 15 minutes
             current_time = datetime.now()
             for channel in self.initial_channels:
                 inactive_chatters = [
