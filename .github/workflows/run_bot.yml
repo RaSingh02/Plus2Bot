@@ -21,7 +21,8 @@ jobs:
     - name: +2 Twitch Bot
       env:
         ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-        CLIENT_ID: ${{ secrets.CLIENT_ID }}
+        CLIENT_ID: ${{ secrets.CLIENT_ID }}    
         BROADCASTER: ${{ secrets.BROADCASTER }}
         COOLDOWN_MINUTES: ${{ secrets.COOLDOWN_MINUTES || 2 }}
+        GITHUB_REPOSITORY: ${{ secrets.GITHUB_REPOSITORY }}
       run: python main.py
