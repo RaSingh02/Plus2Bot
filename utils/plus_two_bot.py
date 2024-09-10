@@ -76,7 +76,7 @@ class PlusTwoBot(commands.Bot):
             if not was_live and is_live:
                 # The broadcaster just went live
                 self.is_operating = True
-                logging.info("The broadcaster is now live. The bot is now operating.")
+                logging.info(f"The broadcaster, {os.getenv('BROADCASTER')}, is now live. The bot is now operating.")
                 # You can start any additional tasks here if needed
             elif was_live and not is_live:
                 # The broadcaster just went offline
@@ -98,7 +98,17 @@ class PlusTwoBot(commands.Bot):
         if message.echo or not message.content.strip():
             return
 
-        logging.info(f"Received message: {message.content} from {message.author.name}")  # Log the received message
+        # Check for +2 and -2 mentions
+        plus_mentions = re.findall(r'\+2\s+@(\w+)', message.content, re.IGNORECASE)
+        minus_mentions = re.findall(r'-2\s+@(\w+)', message.content, re.IGNORECASE)
+
+        # Log if there are any +2 or -2 mentions
+        if plus_mentions:
+            for user in plus_mentions:
+                logging.info(f"{message.author.name} gave a +2 to @{user}.")  # Log the +2 action
+        if minus_mentions:
+            for user in minus_mentions:
+                logging.info(f"{message.author.name} gave a -2 to @{user}.")  # Log the -2 action
 
         # Ensure the bot is operating before processing messages
         if not self.is_operating:
@@ -113,12 +123,6 @@ class PlusTwoBot(commands.Bot):
         # Update chatter list
         self.current_chatters[message.channel.name].add(message.author.name.lower())
         self.chatter_last_seen[message.channel.name][message.author.name.lower()] = datetime.now()
-
-        # Check for +2 and -2 mentions
-        plus_mentions = re.findall(r'\+2\s+@(\w+)', message.content, re.IGNORECASE)
-        minus_mentions = re.findall(r'-2\s+@(\w+)', message.content, re.IGNORECASE)
-
-        logging.info(f"Plus mentions: {plus_mentions}, Minus mentions: {minus_mentions}")  # Log mentions found
 
         # Combine mentions into a single dictionary for batch processing
         mentions = {}
