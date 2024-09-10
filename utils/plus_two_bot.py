@@ -144,9 +144,6 @@ class PlusTwoBot(commands.Bot):
                 time_left = self.cooldown_manager.get_cooldown_time(author.name.lower())
                 await channel.send(f"@{author.name}, you must wait {time_left.seconds // 60} minutes and {time_left.seconds % 60} seconds before giving another {action} to anyone.")
 
-        # Save data after processing all mentions
-        self.save_data()
-
     def update_count(self, username, is_plus):
         # Update +2 count for a user
         change = 1 if is_plus else -1
