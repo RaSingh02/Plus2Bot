@@ -1,0 +1,47 @@
+name: Deploy Website
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Merge leaderboard data
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git fetch origin leaderboard-data
+          git merge origin/leaderboard-data --allow-unrelated-histories -X theirs
+        continue-on-error: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+
+      - name: Install website dependencies
+        working-directory: ./website
+        run: npm ci
+
+      - name: Build website
+        working-directory: ./website
+        run: |
+          npm run build
+          touch out/.nojekyll
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./website/out

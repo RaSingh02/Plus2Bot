@@ -154,5 +154,8 @@ class DatabaseManager:
             'monthly': monthly
         }
 
+        # Ensure the directory exists
+        os.makedirs('website/public', exist_ok=True)
+        
         with open('website/public/leaderboard_data.json', 'w') as f:
             json.dump(data, f)

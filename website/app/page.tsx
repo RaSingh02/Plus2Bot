@@ -59,19 +59,19 @@ export default function Home() {
 
   const fetchLeaderboardData = useCallback(async () => {
     try {
-      const response = await fetch(`/api/leaderboard?page=${currentPage}&pageSize=${pageSize}`);
+      const response = await fetch('/leaderboard_data.json');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      setLeaderboardData(data);
-      setTotalItems(data.totalCounts[currentView]);
+      setLeaderboardData(data[currentView]);
+      setTotalItems(data[currentView].length);
     } catch (error) {
       console.error('Failed to load leaderboard data:', error);
       setErrorMessage('Failed to load leaderboard data');
       setLeaderboardData(null);
     }
-  }, [currentPage, pageSize, currentView]);
+  }, [currentView]);
 
   const pollLeaderboardData = useCallback(() => {
     const pollInterval = setInterval(fetchLeaderboardData, 60000); // Poll every 60 seconds
@@ -122,6 +122,8 @@ export default function Home() {
 
   useEffect(() => {
     fetchLeaderboardData();
+    const interval = setInterval(fetchLeaderboardData, 300000); // Fetch every 5 minutes
+    return () => clearInterval(interval);
   }, [fetchLeaderboardData]);
 
   const handleSearch = async (searchUsername: string) => {

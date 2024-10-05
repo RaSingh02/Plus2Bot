@@ -42,6 +42,7 @@ class PlusTwoBot(commands.Bot):
         self.action_queue = Queue()
         self.queue_worker = Thread(target=self.process_queue)
         self.queue_worker.start()
+        self.bg_task = None
 
     def load_data(self):
         # Load data from database
