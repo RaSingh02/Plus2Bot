@@ -1,4 +1,4 @@
-name: Deploy Twitch Bot and Website
+name: Deploy Website and Run Twitch Bot
 
 on:
   push:
@@ -12,6 +12,25 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+
+      - name: Install website dependencies
+        working-directory: ./website
+        run: npm ci
+
+      - name: Build website
+        working-directory: ./website
+        run: npm run build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./website/out
 
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -33,25 +52,6 @@ jobs:
         run: |
           python main.py &
           sleep 300  # Run the bot for 5 minutes to generate initial data
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '18'
-
-      - name: Install website dependencies
-        working-directory: ./website
-        run: npm ci
-
-      - name: Build website
-        working-directory: ./website
-        run: npm run build
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./website/out
 
       - name: Stop Twitch bot
         run: pkill -f "python main.py"

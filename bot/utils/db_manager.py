@@ -20,6 +20,7 @@ class DatabaseManager:
         self.connection_pool = Queue(maxsize=10)
         for _ in range(10):
             self.connection_pool.put(connect(db_file))
+        self.create_tables()  # Add this line
 
     @contextmanager
     def get_connection(self):
