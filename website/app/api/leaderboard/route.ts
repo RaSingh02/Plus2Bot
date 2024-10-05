@@ -8,6 +8,8 @@ const limiter = rateLimit({
   uniqueTokenPerInterval: 1000, // Increase from 500 to 1000
 });
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     await limiter.check(request, 20, 'CACHE_TOKEN'); // Increase from 10 to 20 requests per minute per user

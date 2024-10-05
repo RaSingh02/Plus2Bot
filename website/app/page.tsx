@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FaArrowUp } from 'react-icons/fa';
 
@@ -11,7 +11,6 @@ import SqueexQuote from './components/SqueexQuote';
 import ErrorModal from './components/ErrorModal';
 import LeaderboardTable from './components/LeaderboardTable';
 import HamburgerMenu from './components/HamburgerMenu';
-import React from 'react';
 
 interface LeaderboardData {
   all_time: [string, number][];
@@ -23,40 +22,30 @@ interface LeaderboardData {
   };
 }
 
-const viewOrder = ['all_time', 'yearly', 'monthly'] as const;
-type ViewType = typeof viewOrder[number];
+type ViewType = 'all_time' | 'yearly' | 'monthly';
 
 export default function Home() {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardData | null>(null);
-  const [searchUsername, setSearchUsername] = useState('');
   const [userStats, setUserStats] = useState<{ username: string; positiveCount: number; negativeCount: number; lastUpdated: string } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('all_time');
-  const [previousView, setPreviousView] = useState<ViewType>('all_time');
-  const [direction, setDirection] = useState<'right' | 'left'>('right');
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [displayedUsername, setDisplayedUsername] = useState<string | null>(null);
   const [showUserCard, setShowUserCard] = useState(false);
-
   const [isInitialized, setIsInitialized] = useState(false);
-
-  const enableTuah = process.env.ENABLE_TUAH === 'true';
-
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(() => {
     if (typeof window !== 'undefined') {
-      const savedPageSize = localStorage.getItem('pageSize');
-      return savedPageSize ? parseInt(savedPageSize, 10) : 20;
+      return parseInt(localStorage.getItem('pageSize') || '20', 10);
     }
     return 20;
   });
   const [totalItems, setTotalItems] = useState(0);
-
   const [podiumData, setPodiumData] = useState<[string, number][]>([]);
+
+  const enableTuah = process.env.ENABLE_TUAH === 'true';
 
   const fetchPodiumData = useCallback(async () => {
     try {
@@ -69,7 +58,6 @@ export default function Home() {
   }, [currentView]);
 
   const fetchLeaderboardData = useCallback(async () => {
-    setIsLoading(true);
     try {
       const response = await fetch(`/api/leaderboard?page=${currentPage}&pageSize=${pageSize}`);
       if (!response.ok) {
@@ -80,11 +68,15 @@ export default function Home() {
       setTotalItems(data.totalCounts[currentView]);
     } catch (error) {
       console.error('Failed to load leaderboard data:', error);
-      setError('Failed to load leaderboard data');
+      setErrorMessage('Failed to load leaderboard data');
       setLeaderboardData(null);
     }
-    setIsLoading(false);
   }, [currentPage, pageSize, currentView]);
+
+  const pollLeaderboardData = useCallback(() => {
+    const pollInterval = setInterval(fetchLeaderboardData, 60000); // Poll every 60 seconds
+    return () => clearInterval(pollInterval);
+  }, [fetchLeaderboardData]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -93,7 +85,6 @@ export default function Home() {
     setIsDarkMode(initialDarkMode);
     setIsInitialized(true);
 
-    // Apply the theme to the document
     document.documentElement.classList.toggle('dark', initialDarkMode);
 
     const savedUsername = localStorage.getItem('username');
@@ -110,7 +101,7 @@ export default function Home() {
     fetchLeaderboardData();
     const cleanup = pollLeaderboardData();
     return cleanup;
-  }, []);
+  }, [fetchLeaderboardData, pollLeaderboardData]);
 
   useEffect(() => {
     if (isInitialized) {
@@ -120,20 +111,9 @@ export default function Home() {
   }, [isDarkMode, isInitialized]);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setShowBackToTop(window.scrollY > 300);
-    };
-
-
+    const handleScroll = () => setShowBackToTop(window.scrollY > 300);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  useEffect(() => {
-    const savedPageSize = localStorage.getItem('pageSize');
-    if (savedPageSize) {
-      setPageSize(parseInt(savedPageSize));
-    }
   }, []);
 
   useEffect(() => {
@@ -170,13 +150,8 @@ export default function Home() {
     setDisplayedUsername(username);
   };
 
-  const pollLeaderboardData = () => {
-    const pollInterval = setInterval(fetchLeaderboardData, 60000); // Poll every 60 seconds
-    return () => clearInterval(pollInterval);
-  };
-
   const toggleColorMode = () => {
-    setIsDarkMode((prevMode) => {
+    setIsDarkMode(prevMode => {
       const newMode = !prevMode;
       localStorage.setItem('theme', newMode ? 'dark' : 'light');
       document.documentElement.classList.toggle('dark', newMode);
@@ -191,11 +166,7 @@ export default function Home() {
   ] as const;
 
   const handleViewChange = (newView: ViewType) => {
-    setPreviousView(currentView);
     setCurrentView(newView);
-    const currentIndex = viewOrder.indexOf(currentView);
-    const newIndex = viewOrder.indexOf(newView);
-    setDirection(newIndex > currentIndex ? 'right' : 'left');
   };
 
   const scrollToTop = () => {

@@ -14,7 +14,7 @@ const SqueexQuote: React.FC = () => {
 
   return (
     <div className="text-center italic text-text-light dark:text-text-dark opacity-70">
-      "{quote}" - Squeex
+      &quot;{quote}&quot; - Squeex
     </div>
   );
 };

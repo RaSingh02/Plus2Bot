@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import path from 'path';
 
-export async function GET(request: Request) {
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const username = searchParams.get('username');
 
