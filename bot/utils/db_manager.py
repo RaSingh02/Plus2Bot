@@ -1,6 +1,7 @@
 import os
 import logging
 import json
+import sqlite3
 
 from sqlite3 import connect
 from contextlib import contextmanager
@@ -12,10 +13,12 @@ from github import Github
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class DatabaseManager:
-    def __init__(self, db_file, pool_size=10):
+    def __init__(self, db_file):
         self.db_file = db_file
-        self.connection_pool = Queue(maxsize=pool_size)
-        for _ in range(pool_size):
+        self.conn = sqlite3.connect(db_file)
+        self.conn.execute('PRAGMA foreign_keys = ON')
+        self.connection_pool = Queue(maxsize=10)
+        for _ in range(10):
             self.connection_pool.put(connect(db_file))
 
     @contextmanager
