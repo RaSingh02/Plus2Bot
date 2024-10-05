@@ -1,6 +1,10 @@
 import os
-import sqlite3
 import logging
+import json
+
+from sqlite3 import connect
+from contextlib import contextmanager
+from queue import Queue
 
 from datetime import datetime
 from github import Github
@@ -8,10 +12,19 @@ from github import Github
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class DatabaseManager:
-    def __init__(self, db_file):
-        # Initialize database connection
-        self.conn = sqlite3.connect(db_file)
-        self.create_tables()
+    def __init__(self, db_file, pool_size=10):
+        self.db_file = db_file
+        self.connection_pool = Queue(maxsize=pool_size)
+        for _ in range(pool_size):
+            self.connection_pool.put(connect(db_file))
+
+    @contextmanager
+    def get_connection(self):
+        connection = self.connection_pool.get()
+        try:
+            yield connection
+        finally:
+            self.connection_pool.put(connection)
 
     def create_tables(self):
         # Create necessary tables if they don't exist
@@ -70,17 +83,15 @@ class DatabaseManager:
         except Exception as e:
             logging.error(f"Error saving data: {e}")
 
-    def update_count(self, username, is_plus):
-        # Update +2 count for a user in a single transaction
-        change = 1 if is_plus else -1
+    def update_count(self, username, new_count):
         with self.conn:
             self.conn.execute('''
                 INSERT INTO plus_two_counts (username, count, last_updated) 
                 VALUES (?, ?, CURRENT_TIMESTAMP) 
                 ON CONFLICT(username) DO UPDATE SET 
-                count = count + ?,
+                count = ?,
                 last_updated = CURRENT_TIMESTAMP
-            ''', (username.lower(), change, change))
+            ''', (username.lower(), new_count, new_count))
 
     def get_top_recipients(self, limit):
         # Get top recipients of +2s
@@ -88,10 +99,10 @@ class DatabaseManager:
         return cursor.fetchall()
 
     def get_user_count(self, username):
-        # Get +2 count for a specific user
-        cursor = self.conn.execute('SELECT count FROM plus_two_counts WHERE username = ?', (username,))
-        result = cursor.fetchone()
-        return result[0] if result else 0
+        with self.conn:
+            cursor = self.conn.execute('SELECT count FROM plus_two_counts WHERE username = ?', (username,))
+            result = cursor.fetchone()
+            return result[0] if result else 0
 
     def upload_db_artifact(self):
         if 'GITHUB_TOKEN' in os.environ:
@@ -99,3 +110,45 @@ class DatabaseManager:
             repo = g.get_repo(os.environ['REPOSITORY_NAME'])
             with open(self.db_file, 'rb') as f:
                 repo.create_git_blob(f.read(), "base64")
+
+    def get_leaderboard(self, timeframe):
+        if timeframe == 'all_time':
+            query = 'SELECT username, count FROM plus_two_counts ORDER BY count DESC LIMIT 10'
+        elif timeframe == 'yearly':
+            query = '''
+                SELECT username, count FROM plus_two_counts
+                WHERE last_updated >= date('now', '-1 year')
+                ORDER BY count DESC LIMIT 10
+            '''
+        elif timeframe == 'monthly':
+            query = '''
+                SELECT username, count FROM plus_two_counts
+                WHERE last_updated >= date('now', '-1 month')
+                ORDER BY count DESC LIMIT 10
+            '''
+        else:
+            raise ValueError("Invalid timeframe")
+
+        self.cursor.execute(query)
+        return self.cursor.fetchall()
+
+    def get_user_stats(self, username):
+        self.cursor.execute('''
+            SELECT count, last_updated FROM plus_two_counts
+            WHERE username = ?
+        ''', (username,))
+        return self.cursor.fetchone()
+
+    def export_data_for_website(self):
+        all_time = self.get_leaderboard('all_time')
+        yearly = self.get_leaderboard('yearly')
+        monthly = self.get_leaderboard('monthly')
+
+        data = {
+            'all_time': all_time,
+            'yearly': yearly,
+            'monthly': monthly
+        }
+
+        with open('website/public/leaderboard_data.json', 'w') as f:
+            json.dump(data, f)

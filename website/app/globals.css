@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f5f5f0;
+  --foreground: #34495e;
+  --primary: #3498db;
+  --secondary: #2ecc71;
+  --accent: #e74c3c;
+  --primary-light: #3498db;
+  --primary-dark: #FF8E53;
+  --secondary-light: #2ecc71;
+  --secondary-dark: #45B7A0;
+  --accent-light: #e74c3c;
+  --accent-dark: #FFB400;
+  --background-light: #f5f5f0;
+  --background-dark: #1A202C;
+  --text-light: #34495e;
+  --text-dark: #E2E8F0;
+}
+
+.dark {
+  --background: #1A202C;
+  --foreground: #E2E8F0;
+  --primary: var(--primary-dark);
+  --secondary: var(--secondary-dark);
+  --accent: var(--accent-dark);
+  --background: var(--background-dark);
+  --text: var(--text-dark);
+}
+
+body {
+  font-family: 'Geist Sans', Arial, sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .smooth-resize {
+    transition: all 0.3s ease-in-out;
+  }
+}
+
+.gradient-bg {
+  background: linear-gradient(45deg, var(--primary), var(--secondary), var(--accent));
+  background-size: 600% 600%;
+  animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.floating-symbol {
+  position: fixed;
+  opacity: 0.1;
+  font-size: 4rem;
+  color: var(--primary);
+  animation: float 6s ease-in-out infinite;
+}
+
+@layer base {
+  body {
+    @apply bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark;
+  }
+}

@@ -5,6 +5,8 @@ import logging
 from twitchio.ext import commands
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from queue import Queue
+from threading import Thread
 
 from .db_manager import DatabaseManager
 from .utils import check_stream_status, is_valid_username
@@ -20,7 +22,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 COOLDOWN_PERIOD = timedelta(minutes=int(os.getenv('COOLDOWN_MINUTES', 2)))
 
 class PlusTwoBot(commands.Bot):
-    def __init__(self):
+    def __init__(self, enable_tuah=False):
         # Initialize the bot
         super().__init__(
             token=os.getenv("ACCESS_TOKEN"),
@@ -36,6 +38,10 @@ class PlusTwoBot(commands.Bot):
         self.current_chatters = {channel: set() for channel in self.initial_channels}
         self.chatter_last_seen = {channel: {} for channel in self.initial_channels}
         self.is_operating = False  # Track if the bot is currently operating
+        self.enable_tuah = enable_tuah
+        self.action_queue = Queue()
+        self.queue_worker = Thread(target=self.process_queue)
+        self.queue_worker.start()
 
     def load_data(self):
         # Load data from database
@@ -61,6 +67,7 @@ class PlusTwoBot(commands.Bot):
         self.loop.create_task(self.periodic_db_upload())
         self.loop.create_task(self.clean_inactive_chatters())
         self.loop.create_task(self.periodic_data_save())  # Start periodic saving
+        self.loop.create_task(self.export_data_for_website())
 
     def reset_total_count(self):
         # Reset the total +2 count
@@ -94,77 +101,66 @@ class PlusTwoBot(commands.Bot):
                 check_interval = 600  # Increase to 10 minutes when not operating
 
     async def event_message(self, message):
-        # Called when a message is sent in the chat
         if message.echo or not message.content.strip():
             return
 
-        # Check for +2 and -2 mentions
-        plus_mentions = re.findall(r'\+2\s+@(\w+)', message.content, re.IGNORECASE)
-        minus_mentions = re.findall(r'-2\s+@(\w+)', message.content, re.IGNORECASE)
+        plus_two_mentions = re.findall(r'\+2\s+@(\w+)', message.content, re.IGNORECASE)
+        minus_two_mentions = re.findall(r'-2\s+@(\w+)', message.content, re.IGNORECASE)
+        
+        mentions = {username: True for username in plus_two_mentions}
+        mentions.update({username: False for username in minus_two_mentions})
 
-        # Log if there are any +2 or -2 mentions
-        if plus_mentions:
-            for user in plus_mentions:
-                logging.info(f"{message.author.name} gave a +2 to @{user}.")  # Log the +2 action
-        if minus_mentions:
-            for user in minus_mentions:
-                logging.info(f"{message.author.name} gave a -2 to @{user}.")  # Log the -2 action
-
-        # Ensure the bot is operating before processing messages
-        if not self.is_operating:
-            logging.warning("Bot is not operating. Ignoring message.")
-            return
-
-        # Ensure the channel is initialized in current_chatters
-        if message.channel.name not in self.current_chatters:
-            self.current_chatters[message.channel.name] = set()
-            self.chatter_last_seen[message.channel.name] = {}
-
-        # Update chatter list
-        self.current_chatters[message.channel.name].add(message.author.name.lower())
-        self.chatter_last_seen[message.channel.name][message.author.name.lower()] = datetime.now()
-
-        # Combine mentions into a single dictionary for batch processing
-        mentions = {}
-        for user in plus_mentions:
-            mentions[user.lower()] = True  # Mark as +2
-        for user in minus_mentions:
-            mentions[user.lower()] = False  # Mark as -2
+        if self.enable_tuah:
+            plus_tuah_mentions = re.findall(r'\+tuah\s+@(\w+)', message.content, re.IGNORECASE)
+            minus_tuah_mentions = re.findall(r'-tuah\s+@(\w+)', message.content, re.IGNORECASE)
+            
+            mentions.update({username: True for username in plus_tuah_mentions})
+            mentions.update({username: False for username in minus_tuah_mentions})
 
         # Process all mentions in batch
         await self.handle_batch_plus_two(message.channel, message.author, mentions)
 
     async def handle_batch_plus_two(self, channel, author, mentions):
-        # Handle batch +2 or -2 commands
         for recipient, is_plus in mentions.items():
             if not is_valid_username(recipient):
                 await channel.send(f"@{author.name}, '{recipient}' is not a valid username.")
                 continue
 
-            action = "+2" if is_plus else "-2"
-            # Check if the author can give a +2
             if self.cooldown_manager.can_give_plus_two(author.name.lower(), COOLDOWN_PERIOD):
                 if recipient in self.current_chatters.get(channel.name, set()):
-                    self.update_count(recipient, is_plus, author.name.lower())  # Pass the giver's name
-                    self.data_changed = True  # Mark data as changed
+                    self.action_queue.put((recipient, is_plus, author.name.lower()))
                 else:
                     await channel.send(f"@{recipient} is not in the chat.")
             else:
                 time_left = self.cooldown_manager.get_cooldown_time(author.name.lower())
-                await channel.send(f"@{author.name}, you must wait {time_left.seconds // 60} minutes and {time_left.seconds % 60} seconds before giving another {action} to anyone.")
+                await channel.send(f"@{author.name}, you must wait {time_left.seconds // 60} minutes and {time_left.seconds % 60} seconds before giving another +2/-2 to anyone.")
+
+    def process_queue(self):
+        while True:
+            action = self.action_queue.get()
+            if action is None:
+                break
+            self.update_count(*action)
+            self.action_queue.task_done()
 
     def update_count(self, username, is_plus, giver):
         # Update +2 count for a user
         change = 1 if is_plus else -1
-        self.db_manager.update_count(username.lower(), change)
-        self.total_plus_twos += change
-        self.total_plus_twos = max(0, self.total_plus_twos)
+        current_count = self.db_manager.get_user_count(username.lower())
+        new_count = max(0, current_count + change)  # Ensure count doesn't go below 0
+        self.db_manager.update_count(username.lower(), new_count)
+        
+        actual_change = new_count - current_count
+        self.total_plus_twos += actual_change
         
         # Log the +2 action with the giver's name
         if is_plus:
             logging.info(f"{username} received a +2 from {giver}.")
         else:
-            logging.info(f"{username} received a -2 from {giver}.")
+            if actual_change == 0:
+                logging.info(f"{username} received a -2 from {giver}, but their count was already at 0.")
+            else:
+                logging.info(f"{username} received a -2 from {giver}.")
 
     @commands.command(name='plus2stats')
     async def plus_two_stats(self, ctx):
@@ -215,3 +211,9 @@ class PlusTwoBot(commands.Bot):
         while True:
             await asyncio.sleep(300)  # Save every 5 minutes
             self.save_data()  # Save data periodically
+
+    async def export_data_for_website(self):
+        while True:
+            await asyncio.sleep(300)  # Export data every 5 minutes
+            self.db_manager.export_data_for_website()
+            logging.info("Exported leaderboard data for website")
