@@ -85,6 +85,47 @@ class DatabaseManager:
             
             conn.commit()
 
+    def get_user_count(self, username: str) -> int:
+        """Get the current count for a specific user"""
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute(
+                "SELECT count FROM plus_two_counts WHERE username = ?",
+                (username.lower(),)
+            ).fetchone()
+            
+            return result[0] if result else 0
+
+    def get_top_users(self, limit: int = 5) -> List[Dict]:
+        """Get top users by count"""
+        with sqlite3.connect(self.db_path) as conn:
+            results = conn.execute(
+                "SELECT username, count FROM plus_two_counts ORDER BY count DESC LIMIT ?",
+                (limit,)
+            ).fetchall()
+            
+            return [{"username": row[0], "count": row[1]} for row in results]
+
+    def get_total_plus_twos(self) -> int:
+        """Get the total number of +2's given"""
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute(
+                "SELECT SUM(positive_count) FROM plus_two_counts"
+            ).fetchone()
+            
+            return result[0] if result[0] is not None else 0
+
+    def reset_user_count(self, username: str) -> None:
+        """Reset a user's count to 0"""
+        current_time = datetime.now().isoformat()
+        
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                UPDATE plus_two_counts 
+                SET count = 0, positive_count = 0, negative_count = 0, last_updated = ?
+                WHERE username = ?
+            """, (current_time, username.lower()))
+            conn.commit()
+
     def get_user_stats(self, username: str) -> Optional[Dict]:
         """Get stats for a specific user"""
         with sqlite3.connect(self.db_path) as conn:
@@ -102,19 +143,3 @@ class DatabaseManager:
                     "last_updated": result[4]
                 }
             return None
-
-    def get_top_users(self, limit: int = 5) -> List[Dict]:
-        """Get top users by count"""
-        with sqlite3.connect(self.db_path) as conn:
-            results = conn.execute(
-                "SELECT * FROM plus_two_counts ORDER BY count DESC LIMIT ?",
-                (limit,)
-            ).fetchall()
-            
-            return [{
-                "username": row[0],
-                "count": row[1],
-                "positive_count": row[2],
-                "negative_count": row[3],
-                "last_updated": row[4]
-            } for row in results]
