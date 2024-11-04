@@ -1,6 +1,6 @@
 # PlusTwo Twitch Bot and Website
 
-PlusTwo is a Twitch chat bot that allows viewers to give "+2/+tuah" or "-2/-tuah" points to other users in the chat. It tracks these interactions, manages cooldowns, and provides statistics. The project also includes a website to display leaderboards and user stats.
+PlusTwo is a Twitch chat bot that allows viewers to give "+2" or "-2" points to other users in the chat. It tracks these interactions, manages cooldowns, and provides statistics. The project also includes a website to display leaderboards and user stats.
 
 ## Features
 
@@ -13,14 +13,13 @@ PlusTwo is a Twitch chat bot that allows viewers to give "+2/+tuah" or "-2/-tuah
 
 ## Bot Setup and Commands
 
-- `+2 @username`: Give +2 to a user
-- `-2 @username`: Give -2 to a user
-- `+tuah @username`: Give +tuah to a user
-- `-tuah @username`: Give -tuah to a user
+- `!+2 @username`: Give +2 to a user
+- `!-2 @username`: Give -2 to a user
 - `!plus2stats`: Show top 5 +2 recipients
 - `!myplus2`: Show your personal +2 count
 - `!totalplus2`: Show total +2 count for the current stream
 - `!commands`: List all available commands
+- `!website`: Display's bot website
 
 ## Website Setup
 
@@ -34,12 +33,17 @@ PlusTwo is a Twitch chat bot that allows viewers to give "+2/+tuah" or "-2/-tuah
    npm install
    ```
 
-3. Run the development server:
+3. Initialize the database:
+   ```bash
+   npm run init-db
+   ```
+
+4. Run the development server:
    ```bash
    npm run dev
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser to view the website.
+5. Open [http://localhost:3000](http://localhost:3000) in your browser to view the website.
 
 ## Running the Bot and Website Together
 
@@ -84,7 +88,7 @@ To modify the website:
 ## Leaderboard
 
 You can view the PlusTwo leaderboard and search for user stats at:
-https://rasingh02.github.io/Plus2Bot/
+...
 
 The leaderboard is updated daily and provides all-time, monthly, and yearly rankings.
 

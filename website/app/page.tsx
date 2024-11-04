@@ -6,12 +6,12 @@ import { FaArrowUp } from 'react-icons/fa';
 import TugOfWarBar from './components/TugOfWarBar';
 import UserCard from './components/UserCard';
 import LeaderboardPodium from './components/LeaderboardPodium';
-import AnimatedSearchBar from './components/AnimatedSearchBar';
 import SqueexQuote from './components/SqueexQuote';
 import ErrorModal from './components/ErrorModal';
 import LeaderboardTable from './components/LeaderboardTable';
-import HamburgerMenu from './components/HamburgerMenu';
 import React from 'react';
+import Footer from './components/Footer';
+import NavBar from './components/NavBar';
 
 interface LeaderboardData {
   all_time: [string, number][];
@@ -21,6 +21,9 @@ interface LeaderboardData {
     positive: number;
     negative: number;
   };
+  username: string;
+  count: number;
+  timeSpent: string;
 }
 
 const viewOrder = ['all_time', 'yearly', 'monthly'] as const;
@@ -35,7 +38,6 @@ export default function Home() {
   const [currentView, setCurrentView] = useState<ViewType>('all_time');
   const [previousView, setPreviousView] = useState<ViewType>('all_time');
   const [direction, setDirection] = useState<'right' | 'left'>('right');
-  const [isDarkMode, setIsDarkMode] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
@@ -43,8 +45,6 @@ export default function Home() {
   const [showUserCard, setShowUserCard] = useState(false);
 
   const [isInitialized, setIsInitialized] = useState(false);
-
-  const enableTuah = process.env.ENABLE_TUAH === 'true';
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(() => {
@@ -87,15 +87,7 @@ export default function Home() {
   }, [currentPage, pageSize, currentView]);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const initialDarkMode = savedTheme ? savedTheme === 'dark' : prefersDarkMode;
-    setIsDarkMode(initialDarkMode);
     setIsInitialized(true);
-
-    // Apply the theme to the document
-    document.documentElement.classList.toggle('dark', initialDarkMode);
-
     const savedUsername = localStorage.getItem('username');
     const userCardClosed = localStorage.getItem('userCardClosed');
 
@@ -111,13 +103,6 @@ export default function Home() {
     const cleanup = pollLeaderboardData();
     return cleanup;
   }, []);
-
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-      document.documentElement.classList.toggle('dark', isDarkMode);
-    }
-  }, [isDarkMode, isInitialized]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -175,15 +160,6 @@ export default function Home() {
     return () => clearInterval(pollInterval);
   };
 
-  const toggleColorMode = () => {
-    setIsDarkMode((prevMode) => {
-      const newMode = !prevMode;
-      localStorage.setItem('theme', newMode ? 'dark' : 'light');
-      document.documentElement.classList.toggle('dark', newMode);
-      return newMode;
-    });
-  };
-
   const viewOptions = [
     { key: 'all_time', label: 'All time' },
     { key: 'yearly', label: 'Yearly' },
@@ -233,27 +209,28 @@ export default function Home() {
     fetchLeaderboardData();
   };
 
-  return (
-    <div className={`min-h-screen flex flex-col ${isDarkMode ? 'dark' : ''}`}>
-      {isInitialized && (
-        <div className="flex-grow bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark">
-          <div className="container mx-auto px-4 py-8">
-            {/* Header */}
-            <header className="flex justify-between items-center mb-8">
-              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-primary-light dark:text-primary-dark transition-all duration-300 ease-in-out">
-                Squeex +2 Leaderboard
-              </h1>
-              <div className="flex items-center space-x-2 sm:space-x-4">
-                <AnimatedSearchBar onSearch={handleSearch} />
-                <HamburgerMenu
-                  isDarkMode={isDarkMode}
-                  toggleColorMode={toggleColorMode}
-                  onUpdateUsername={handleUpdateUsername}
-                  onProfileClick={handleProfileClick}
-                />
-              </div>
-            </header>
+  const handleUserHover = async (username: string) => {
+    try {
+      const response = await fetch(`/api/user-stats?username=${encodeURIComponent(username)}`);
+      if (!response.ok) throw new Error('Failed to fetch user stats');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+      return null;
+    }
+  };
 
+  return (
+    <div className="min-h-screen flex flex-col">
+      {isInitialized && (
+        <div className="flex-grow bg-[#2d2d2d] text-gray-300 flex flex-col">
+          <NavBar
+            onUpdateUsername={handleUpdateUsername}
+            onProfileClick={handleProfileClick}
+            onSearch={handleSearch}
+          />
+
+          <div className="container mx-auto px-4 py-8 flex-grow">
             {/* User card */}
             <AnimatePresence mode="popLayout">
               {showUserCard && userStats && displayedUsername && (
@@ -263,9 +240,7 @@ export default function Home() {
                     positiveCount={userStats.positiveCount}
                     negativeCount={userStats.negativeCount}
                     lastUpdated={userStats.lastUpdated}
-                    isDarkMode={isDarkMode}
                     onClose={handleCloseUserCard}
-                    enableTuah={enableTuah}
                   />
                 </AnimatedUserCardWrapper>
               )}
@@ -280,18 +255,18 @@ export default function Home() {
             )}
 
             {/* View options */}
-            <nav className="mb-4 flex justify-center space-x-4">
-              {viewOptions.map((option) => (
+            <nav className="flex justify-center space-x-2 mb-6">
+              {viewOptions.map(({ key, label }) => (
                 <button
-                  key={option.key}
-                  onClick={() => handleViewChange(option.key)}
-                  className={`px-4 py-2 rounded-full transition-colors duration-200 ${
-                    currentView === option.key
-                      ? 'bg-primary-light dark:bg-primary-dark text-white font-bold'
-                      : 'bg-gray-200 dark:bg-gray-700 text-text-light dark:text-text-dark hover:bg-gray-300 dark:hover:bg-gray-600'
+                  key={key}
+                  onClick={() => handleViewChange(key)}
+                  className={`px-4 py-2 rounded ${
+                    currentView === key
+                      ? 'bg-[#9147ff] text-white'
+                      : 'bg-[#1a1a1a] text-gray-300 hover:bg-[#3d3d3d]'
                   }`}
                 >
-                  {option.label}
+                  {label}
                 </button>
               ))}
             </nav>
@@ -303,9 +278,8 @@ export default function Home() {
                   <LeaderboardPodium 
                     key={`podium-${currentView}`}
                     data={podiumData}
-                    isDarkMode={isDarkMode}
-                    barColor={''}
-                    backgroundColor={''}
+                    barColor="#9147ff"
+                    backgroundColor="#1a1a1a"
                     onUsernameClick={handleSearch}
                   />
                 </div>
@@ -317,24 +291,28 @@ export default function Home() {
                     totalItems={totalItems}
                     onPageChange={handlePageChange}
                     onPageSizeChange={handlePageSizeChange}
-                    isDarkMode={isDarkMode}
                     onUsernameClick={handleSearch}
+                    onUserHover={handleUserHover}
                   />
                 </div>
               </>
             )}
-            
-            {/* SqueexQuote */}
-            <footer className="mt-auto pt-4">
-              <SqueexQuote />
-            </footer>
           </div>
+
+          <footer className="bg-[#1a1a1a] text-white w-full">
+            <div className="container mx-auto py-4">
+              <div className="flex flex-col items-center space-y-1">
+                <SqueexQuote />
+                <Footer />
+              </div>
+            </div>
+          </footer>
         </div>
       )}
       {showBackToTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-4 right-4 bg-primary-light dark:bg-primary-dark text-white p-2 rounded-full shadow-lg hover:bg-opacity-80 transition-opacity"
+          className="fixed bottom-4 right-4 bg-[#9147ff] text-white p-2 rounded-full shadow-lg hover:opacity-80 transition-opacity"
           aria-label="Back to top"
         >
           <FaArrowUp />

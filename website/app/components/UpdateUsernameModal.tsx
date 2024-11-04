@@ -4,10 +4,9 @@ import { motion } from 'framer-motion';
 interface UpdateUsernameModalProps {
   onClose: () => void;
   onUpdateUsername: (newUsername: string) => void;
-  isDarkMode: boolean;
 }
 
-const UpdateUsernameModal: React.FC<UpdateUsernameModalProps> = ({ onClose, onUpdateUsername, isDarkMode }) => {
+const UpdateUsernameModal: React.FC<UpdateUsernameModalProps> = ({ onClose, onUpdateUsername }) => {
   const [newUsername, setNewUsername] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -45,7 +44,7 @@ const UpdateUsernameModal: React.FC<UpdateUsernameModalProps> = ({ onClose, onUp
         ref={modalRef}
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className={`${isDarkMode ? 'bg-gray-800 text-gray-200' : 'bg-white text-gray-800'} rounded-lg p-6 w-full max-w-md mx-2 sm:mx-0`}
+        className="bg-[#1a1a1a] text-gray-300 rounded-lg p-6 w-full max-w-md mx-2 sm:mx-0"
       >
         <h2 className="text-2xl font-bold mb-4">Update Twitch Username</h2>
         <form onSubmit={handleSubmit}>
@@ -55,21 +54,19 @@ const UpdateUsernameModal: React.FC<UpdateUsernameModalProps> = ({ onClose, onUp
             value={newUsername}
             onChange={(e) => setNewUsername(e.target.value)}
             placeholder="Enter new username"
-            className={`w-full px-3 py-2 border rounded-md ${
-              isDarkMode ? 'bg-gray-700 text-gray-200 border-gray-600' : 'bg-gray-100 text-gray-700 border-gray-300'
-            } mb-4`}
+            className="w-full px-3 py-2 border rounded-md bg-[#2d2d2d] text-gray-300 border-gray-700 mb-4 focus:border-[#9147ff] focus:outline-none"
           />
           <div className="flex justify-end space-x-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
+              className="px-4 py-2 bg-[#2d2d2d] text-gray-300 rounded-md hover:bg-[#3d3d3d]"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+              className="px-4 py-2 bg-[#9147ff] text-white rounded-md hover:opacity-90"
             >
               Update
             </button>

@@ -11,14 +11,12 @@ interface LeaderboardEntry {
 
 interface LeaderboardPodiumProps {
   data: LeaderboardEntry[] | [string, number][];
-  isDarkMode: boolean;
-  showBackground?: boolean;
   barColor: string;
   backgroundColor: string;
   onUsernameClick: (username: string) => void;
 }
 
-const Bar = ({ position, height, color, username, count, isDarkMode, onUsernameClick }: { position: THREE.Vector3; height: number; color: string; username: string; count: number; isDarkMode: boolean; onUsernameClick: (username: string) => void }) => {
+const Bar = ({ position, height, username, count, onUsernameClick }: { position: THREE.Vector3; height: number; username: string; count: number; onUsernameClick: (username: string) => void }) => {
   const mesh = useRef<Mesh>(null);
   const [animatedHeight, setAnimatedHeight] = React.useState(0);
   
@@ -32,28 +30,28 @@ const Bar = ({ position, height, color, username, count, isDarkMode, onUsernameC
     }
   });
 
-  const textColor = isDarkMode ? 'white' : 'black';
-
   return (
     <group position={position}>
-      <mesh ref={mesh} position={[0, animatedHeight / 2, 0]} scale={[1, animatedHeight, 1]}>
-        <boxGeometry args={[0.8, 1, 0.8]} />
-        <meshStandardMaterial color={color} />
+      <mesh ref={mesh} position={[0, animatedHeight / 2, 0]}>
+        <boxGeometry args={[0.5, animatedHeight, 0.5]} />
+        <meshStandardMaterial color="#9147ff" />
       </mesh>
-      <Text 
-        position={[0, -0.1, 0.5]} 
-        fontSize={0.2} 
-        color={textColor}
+      <Text
+        position={[0, -0.2, 0.3]}
+        fontSize={0.15}
+        color="#9147ff"
+        anchorX="center"
+        anchorY="middle"
         onClick={() => onUsernameClick(username)}
-        onPointerOver={() => document.body.style.cursor = 'pointer'}
-        onPointerOut={() => document.body.style.cursor = 'default'}
       >
         {username}
       </Text>
-      <Text 
-        position={[0, animatedHeight + 0.2, 0]} 
-        fontSize={0.2} 
-        color={textColor}
+      <Text
+        position={[0, -0.4, 0.3]}
+        fontSize={0.12}
+        color="gray"
+        anchorX="center"
+        anchorY="middle"
       >
         {count}
       </Text>
@@ -86,10 +84,8 @@ const CameraController = ({ initialY }: { initialY: number }) => {
   return null;
 };
 
-const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ data, isDarkMode, showBackground = false, onUsernameClick }) => {
+const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ data, barColor, backgroundColor, onUsernameClick }) => {
   const podiumOrder = [1, 0, 2]; // 2nd, 1st, 3rd
-  const barColor = isDarkMode ? '#FF8E53' : '#3498db'; // primary-dark and primary-light colors
-  const backgroundColor = isDarkMode ? '#1A202C' : '#f5f5f0';
 
   const getEntry = (index: number): [string, number] => {
     if (!data || !data[index]) return ['', 0];
@@ -105,9 +101,9 @@ const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ data, isDarkMode,
   }
 
   return (
-    <div className="w-full h-[300px] sm:h-[400px] mx-auto" style={{ backgroundColor: showBackground ? backgroundColor : 'transparent' }}>
+    <div className="w-full h-[300px] sm:h-[400px] mx-auto rounded-lg">
       <Canvas camera={{ position: [0, 0, 3], fov: 55 }}>
-        {showBackground && <color attach="background" args={[backgroundColor]} />}
+        
         <ambientLight intensity={1.2} />
         <pointLight position={[10, 10, 10]} intensity={1.5} />
         <CameraController initialY={0.35} />
@@ -121,10 +117,8 @@ const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ data, isDarkMode,
                 key={`${username}-${count}`}
                 position={new THREE.Vector3(xPosition, -1, 0)}
                 height={height}
-                color={barColor}
                 username={username}
                 count={count}
-                isDarkMode={isDarkMode}
                 onUsernameClick={onUsernameClick}
               />
             );

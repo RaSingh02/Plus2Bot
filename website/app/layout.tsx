@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Squeex +2 Leaderboard",
+  title: "SqueexPlus2",
   description: "Leaderboard for +2 Twitch Bot for Squeex",
   icons: {
     icon: '/xdd.webp',
@@ -19,7 +19,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className} suppressHydrationWarning={true}>{children}</body>
+      <body>{children}</body>
     </html>
   );
 }

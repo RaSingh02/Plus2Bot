@@ -1,0 +1,7 @@
+2024-11-03 18:23:30,044 - ERROR - Failed to initialize database: expected str, bytes or os.PathLike object, not NoneType
+2024-11-03 18:24:25,567 - INFO - Using database path: c:\Users\zeroz\OneDrive\Documents\GitHub\Plus2Bot\data\plus_two.db
+2024-11-03 18:24:25,570 - INFO - Database initialized at: c:\Users\zeroz\OneDrive\Documents\GitHub\Plus2Bot\data\plus_two.db
+2024-11-03 18:24:25,570 - INFO - Bot initialized with database connection
+2024-11-03 18:24:26,437 - INFO - Successfully logged onto Twitch WS: plus2tracker
+2024-11-03 18:24:26,470 - INFO - Logged in as | plus2tracker
+2024-11-03 18:24:42,436 - INFO - +2: zerozmercy -> zerozmercy

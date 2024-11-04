@@ -1,154 +1,120 @@
 import os
 import logging
-import json
-
-from sqlite3 import connect
-from contextlib import contextmanager
-from queue import Queue
-
+import sqlite3
 from datetime import datetime
-from github import Github
+from typing import Dict, List, Optional
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('db.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger('db')
 
 class DatabaseManager:
-    def __init__(self, db_file, pool_size=10):
-        self.db_file = db_file
-        self.connection_pool = Queue(maxsize=pool_size)
-        for _ in range(pool_size):
-            self.connection_pool.put(connect(db_file))
-
-    @contextmanager
-    def get_connection(self):
-        connection = self.connection_pool.get()
-        try:
-            yield connection
-        finally:
-            self.connection_pool.put(connection)
-
-    def create_tables(self):
-        # Create necessary tables if they don't exist
-        with self.conn:
-            # Table for storing +2 counts for each user
-            self.conn.execute('''
-                CREATE TABLE IF NOT EXISTS plus_two_counts (
-                    username TEXT PRIMARY KEY,
-                    count INTEGER NOT NULL DEFAULT 0,
-                    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            # Table for tracking cooldowns between users
-            self.conn.execute('''
-                CREATE TABLE IF NOT EXISTS cooldown_tracker (
-                    sender TEXT,
-                    recipient TEXT,
-                    timestamp DATETIME,
-                    PRIMARY KEY (sender, recipient)
-                )
-            ''')
-            # Table for storing total +2 count
-            self.conn.execute('''
-                CREATE TABLE IF NOT EXISTS total_counts (
-                    id INTEGER PRIMARY KEY,
-                    count INTEGER NOT NULL DEFAULT 0
-                )
-            ''')
-            # Initialize total count if not exists
-            if self.conn.execute('SELECT count FROM total_counts WHERE id = 1').fetchone() is None:
-                self.conn.execute('INSERT INTO total_counts (id, count) VALUES (1, 0)')
-
-    def load_data(self):
-        # Load cooldown tracker and total +2 count from database
-        cooldown_tracker = {}
-        cursor = self.conn.execute('SELECT sender, recipient, timestamp FROM cooldown_tracker')
-        for row in cursor:
-            sender, recipient, timestamp = row
-            cooldown_tracker.setdefault(sender, {})[recipient] = datetime.fromisoformat(timestamp)
-        
-        cursor = self.conn.execute('SELECT count FROM total_counts WHERE id = 1')
-        total_plus_twos = cursor.fetchone()[0]
-        
-        return cooldown_tracker, total_plus_twos
-
-    def save_data(self, cooldown_tracker, total_plus_twos):
-        try:
-            with self.conn:
-                self.conn.execute('DELETE FROM cooldown_tracker')
-                for sender, recipients in cooldown_tracker.items():
-                    for recipient, timestamp in recipients.items():
-                        self.conn.execute('INSERT INTO cooldown_tracker (sender, recipient, timestamp) VALUES (?, ?, ?)', 
-                                        (sender, recipient, timestamp.isoformat()))
-                self.conn.execute('UPDATE total_counts SET count = ? WHERE id = 1', (total_plus_twos,))
-            logging.info("Data saved successfully.")
-        except Exception as e:
-            logging.error(f"Error saving data: {e}")
-
-    def update_count(self, username, new_count):
-        with self.conn:
-            self.conn.execute('''
-                INSERT INTO plus_two_counts (username, count, last_updated) 
-                VALUES (?, ?, CURRENT_TIMESTAMP) 
-                ON CONFLICT(username) DO UPDATE SET 
-                count = ?,
-                last_updated = CURRENT_TIMESTAMP
-            ''', (username.lower(), new_count, new_count))
-
-    def get_top_recipients(self, limit):
-        # Get top recipients of +2s
-        cursor = self.conn.execute('SELECT username, count FROM plus_two_counts ORDER BY count DESC LIMIT ?', (limit,))
-        return cursor.fetchall()
-
-    def get_user_count(self, username):
-        with self.conn:
-            cursor = self.conn.execute('SELECT count FROM plus_two_counts WHERE username = ?', (username,))
-            result = cursor.fetchone()
-            return result[0] if result else 0
-
-    def upload_db_artifact(self):
-        if 'GITHUB_TOKEN' in os.environ:
-            g = Github(os.environ['GITHUB_TOKEN'])
-            repo = g.get_repo(os.environ['REPOSITORY_NAME'])
-            with open(self.db_file, 'rb') as f:
-                repo.create_git_blob(f.read(), "base64")
-
-    def get_leaderboard(self, timeframe):
-        if timeframe == 'all_time':
-            query = 'SELECT username, count FROM plus_two_counts ORDER BY count DESC LIMIT 10'
-        elif timeframe == 'yearly':
-            query = '''
-                SELECT username, count FROM plus_two_counts
-                WHERE last_updated >= date('now', '-1 year')
-                ORDER BY count DESC LIMIT 10
-            '''
-        elif timeframe == 'monthly':
-            query = '''
-                SELECT username, count FROM plus_two_counts
-                WHERE last_updated >= date('now', '-1 month')
-                ORDER BY count DESC LIMIT 10
-            '''
+    def __init__(self, db_path: str = None):
+        if db_path is None:
+            # Create data directory if it doesn't exist
+            data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+            os.makedirs(data_dir, exist_ok=True)
+            self.db_path = os.path.join(data_dir, 'plus_two.db')
         else:
-            raise ValueError("Invalid timeframe")
+            self.db_path = db_path
+            
+        logger.info(f"Using database path: {self.db_path}")
+        self._init_db()
+        
+    def _init_db(self) -> None:
+        """Initialize the database and create tables if they don't exist"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS plus_two_counts (
+                        username TEXT PRIMARY KEY,
+                        count INTEGER DEFAULT 0,
+                        positive_count INTEGER DEFAULT 0,
+                        negative_count INTEGER DEFAULT 0,
+                        last_updated TEXT
+                    )
+                """)
+                conn.commit()
+                
+            logger.info(f"Database initialized at: {self.db_path}")
+        except sqlite3.Error as e:
+            logger.error(f"Database initialization error: {e}")
+            raise
 
-        self.cursor.execute(query)
-        return self.cursor.fetchall()
+    def update_counts(self, username: str, is_positive: bool) -> None:
+        """Update user counts when they receive a +2 or -2"""
+        current_time = datetime.now().isoformat()
+        
+        with sqlite3.connect(self.db_path) as conn:
+            # First try to get existing record
+            result = conn.execute(
+                "SELECT count, positive_count, negative_count FROM plus_two_counts WHERE username = ?",
+                (username.lower(),)
+            ).fetchone()
 
-    def get_user_stats(self, username):
-        self.cursor.execute('''
-            SELECT count, last_updated FROM plus_two_counts
-            WHERE username = ?
-        ''', (username,))
-        return self.cursor.fetchone()
+            if result:
+                count, positive_count, negative_count = result
+                if is_positive:
+                    count += 1
+                    positive_count += 1
+                else:
+                    count = max(0, count - 1)  # Ensure count doesn't go below 0
+                    negative_count += 1
 
-    def export_data_for_website(self):
-        all_time = self.get_leaderboard('all_time')
-        yearly = self.get_leaderboard('yearly')
-        monthly = self.get_leaderboard('monthly')
+                conn.execute("""
+                    UPDATE plus_two_counts 
+                    SET count = ?, positive_count = ?, negative_count = ?, last_updated = ?
+                    WHERE username = ?
+                """, (count, positive_count, negative_count, current_time, username.lower()))
+            else:
+                # New user
+                count = 1 if is_positive else 0
+                positive_count = 1 if is_positive else 0
+                negative_count = 0 if is_positive else 1
+                
+                conn.execute("""
+                    INSERT INTO plus_two_counts (username, count, positive_count, negative_count, last_updated)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (username.lower(), count, positive_count, negative_count, current_time))
+            
+            conn.commit()
 
-        data = {
-            'all_time': all_time,
-            'yearly': yearly,
-            'monthly': monthly
-        }
+    def get_user_stats(self, username: str) -> Optional[Dict]:
+        """Get stats for a specific user"""
+        with sqlite3.connect(self.db_path) as conn:
+            result = conn.execute(
+                "SELECT * FROM plus_two_counts WHERE username = ?",
+                (username.lower(),)
+            ).fetchone()
+            
+            if result:
+                return {
+                    "username": result[0],
+                    "count": result[1],
+                    "positive_count": result[2],
+                    "negative_count": result[3],
+                    "last_updated": result[4]
+                }
+            return None
 
-        with open('website/public/leaderboard_data.json', 'w') as f:
-            json.dump(data, f)
+    def get_top_users(self, limit: int = 5) -> List[Dict]:
+        """Get top users by count"""
+        with sqlite3.connect(self.db_path) as conn:
+            results = conn.execute(
+                "SELECT * FROM plus_two_counts ORDER BY count DESC LIMIT ?",
+                (limit,)
+            ).fetchall()
+            
+            return [{
+                "username": row[0],
+                "count": row[1],
+                "positive_count": row[2],
+                "negative_count": row[3],
+                "last_updated": row[4]
+            } for row in results]

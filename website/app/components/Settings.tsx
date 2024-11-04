@@ -65,7 +65,6 @@ const Settings: React.FC<SettingsProps> = ({ isDarkMode, toggleColorMode, onUpda
             onUpdateUsername(newUsername);
             setShowUpdateUsernameModal(false);
           }}
-          isDarkMode={isDarkMode}
         />
       )}
     </div>
