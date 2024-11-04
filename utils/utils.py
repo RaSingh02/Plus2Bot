@@ -1,10 +1,6 @@
 import aiohttp
 import logging
 
-def is_valid_username(username):
-    # Check if the username is valid (max 25 characters)
-    return len(username) <= 25
-
 async def check_stream_status(client_id, access_token, broadcaster):
     # Check if the broadcaster's stream is live
     headers = {
